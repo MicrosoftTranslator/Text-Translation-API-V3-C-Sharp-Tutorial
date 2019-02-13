@@ -19,14 +19,14 @@ namespace MSTranslatorTextDemo
     {
         // This sample uses the Cognitive Services subscription key for all services. To learn more about
         // authentication options, see: https://docs.microsoft.com/azure/cognitive-services/authentication.
-        const string COGNITIVE_SERVICES_KEY = "11a083f7733b4d118a60fb35c4424b90";
-
+        const string COGNITIVE_SERVICES_KEY = "YOUR_COG_SERVICES_SUBSCRIPTION_KEY";
+        // Endpoints for Translator Text and Bing Spell Check
         public static readonly string TEXT_TRANSLATION_API_ENDPOINT = "https://api.cognitive.microsofttranslator.com/{0}?api-version=3.0";
         const string BING_SPELL_CHECK_API_ENDPOINT = "https://westus.api.cognitive.microsoft.com/bing/v7.0/spellcheck/";
+        // An array of language codes
+        private string[] languageCodes;
 
-        private string[] languageCodes;     // array of language codes
-
-        // Dictionary to map language code from friendly name (sorted case-insensitively on language name)
+        // Dictionary to map language codes from friendly name (sorted case-insensitively on language name)
         private SortedDictionary<string, string> languageCodesAndTitles =
             new SortedDictionary<string, string>(Comparer<string>.Create((a, b) => string.Compare(a, b, true)));
 
@@ -44,9 +44,12 @@ namespace MSTranslatorTextDemo
             }
             else
             {
-                InitializeComponent();          // start the GUI
-                GetLanguagesForTranslate();     // get codes and friendly names of languages that can be translated
-                PopulateLanguageMenus();        // fill the drop-down language lists
+                // Start GUI
+                InitializeComponent();
+                // Get languages for drop-downs
+                GetLanguagesForTranslate();
+                // Populate drop-downs with values from GetLanguagesForTranslate
+                PopulateLanguageMenus();
             }
         }
 
@@ -71,7 +74,7 @@ namespace MSTranslatorTextDemo
                 ToLanguageComboBox.Items.Add(menuItem);
             }
 
-            // set default languages
+            // Set default languages
             FromLanguageComboBox.SelectedItem = "Detect";
             ToLanguageComboBox.SelectedItem = "English";
         }
@@ -81,14 +84,14 @@ namespace MSTranslatorTextDemo
         {
             string detectUri = string.Format(TEXT_TRANSLATION_API_ENDPOINT ,"detect");
 
-            // create request to Text Analytics API
+            // Create request to Detect languages with Translator Text
             HttpWebRequest detectLanguageWebRequest = (HttpWebRequest)WebRequest.Create(detectUri);
             detectLanguageWebRequest.Headers.Add("Ocp-Apim-Subscription-Key", COGNITIVE_SERVICES_KEY);
             detectLanguageWebRequest.Headers.Add("Ocp-Apim-Subscription-Region", "westus");
             detectLanguageWebRequest.ContentType = "application/json; charset=utf-8";
             detectLanguageWebRequest.Method = "POST";
 
-            // create and send body of request
+            // Send request
             var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
             string jsonText = serializer.Serialize(text);
 
@@ -102,12 +105,12 @@ namespace MSTranslatorTextDemo
 
             HttpWebResponse response = (HttpWebResponse)detectLanguageWebRequest.GetResponse();
 
-            // read and parse JSON response
+            // Read and parse JSON response
             var responseStream = response.GetResponseStream();
             var jsonString = new StreamReader(responseStream, Encoding.GetEncoding("utf-8")).ReadToEnd();
             dynamic jsonResponse = serializer.DeserializeObject(jsonString);
 
-            // fish out the detected language code
+            // Fish out the detected language code
             var languageInfo = jsonResponse[0];
             if (languageInfo["score"] > (decimal)0.5)
             {
@@ -123,13 +126,13 @@ namespace MSTranslatorTextDemo
         {
             string uri = BING_SPELL_CHECK_API_ENDPOINT + "?mode=spell&mkt=en-US";
 
-            // create request to Bing Spell Check API
+            // Create a request to Bing Spell Check API
             HttpWebRequest spellCheckWebRequest = (HttpWebRequest)WebRequest.Create(uri);
             spellCheckWebRequest.Headers.Add("Ocp-Apim-Subscription-Key", COGNITIVE_SERVICES_KEY);
             spellCheckWebRequest.Method = "POST";
             spellCheckWebRequest.ContentType = "application/x-www-form-urlencoded"; // doesn't work without this
 
-            // create and send body of request
+            // Create and send the request
             string body = "text=" + System.Web.HttpUtility.UrlEncode(text);
             byte[] data = Encoding.UTF8.GetBytes(body);
             spellCheckWebRequest.ContentLength = data.Length;
@@ -137,15 +140,15 @@ namespace MSTranslatorTextDemo
                 requestStream.Write(data, 0, data.Length);
             HttpWebResponse response = (HttpWebResponse)spellCheckWebRequest.GetResponse();
 
-            // read and parse JSON response and get spelling corrections
+            // Read and parse the JSON response; get spelling corrections
             var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
             var responseStream = response.GetResponseStream();
             var jsonString = new StreamReader(responseStream, Encoding.GetEncoding("utf-8")).ReadToEnd();
             dynamic jsonResponse = serializer.DeserializeObject(jsonString);
             var flaggedTokens = jsonResponse["flaggedTokens"];
 
-            // construct sorted dictionary of corrections in reverse order in string (right to left)
-            // so that making a correction can't affect later indexes
+            // Construct sorted dictionary of corrections in reverse order (right to left)
+            // This ensures that changes don't impact later indexes
             var corrections = new SortedDictionary<int, string[]>(Comparer<int>.Create((a, b) => b.CompareTo(a)));
             for (int i = 0; i < flaggedTokens.Length; i++)
             {
@@ -156,13 +159,13 @@ namespace MSTranslatorTextDemo
                         { correction["token"], suggestion["suggestion"] };  // dict value = {error, correction}
             }
 
-            // apply the corrections in order from right to left
+            // Apply spelling corrections, in order, from right to left
             foreach (int i in corrections.Keys)
             {
                 var oldtext = corrections[i][0];
                 var newtext = corrections[i][1];
 
-                // apply capitalization from original text to correction - all caps or initial caps
+                // Apply capitalization from original text to correction - all caps or initial caps
                 if (text.Substring(i, oldtext.Length).All(char.IsUpper)) newtext = newtext.ToUpper();
                 else if (char.IsUpper(text[i])) newtext = newtext[0].ToString().ToUpper() + newtext.Substring(1);
 
@@ -175,13 +178,13 @@ namespace MSTranslatorTextDemo
         // ***** GET TRANSLATABLE LANGUAGE CODES
         private void GetLanguagesForTranslate()
         {
-            // send request to get supported language codes
+            // Send a request to get supported language codes
             string uri = String.Format(TEXT_TRANSLATION_API_ENDPOINT, "languages") + "&scope=translation";
             WebRequest WebRequest = WebRequest.Create(uri);
             WebRequest.Headers.Add("Ocp-Apim-Subscription-Key", COGNITIVE_SERVICES_KEY);
             WebRequest.Headers.Add("Accept-Language", "en");
             WebResponse response = null;
-            // read and parse the JSON response
+            // Read and parse the JSON response
             response = WebRequest.GetResponse();
             using (var reader = new StreamReader(response.GetResponseStream(), UnicodeEncoding.UTF8))
             {
@@ -204,7 +207,7 @@ namespace MSTranslatorTextDemo
             string fromLanguage = FromLanguageComboBox.SelectedValue.ToString();
             string fromLanguageCode;
 
-            // auto-detect source language if requested
+            // Auto-detect source language if requested
             if (fromLanguage == "Detect")
             {
                 fromLanguageCode = DetectLanguage(textToTranslate);
@@ -221,7 +224,7 @@ namespace MSTranslatorTextDemo
 
             string toLanguageCode = languageCodesAndTitles[ToLanguageComboBox.SelectedValue.ToString()];
 
-            // spell-check the source text if the source language is English
+            // Spell-check the source text if the source language is English
             if (fromLanguageCode == "en")
             {
                 if (textToTranslate.StartsWith("-"))    // don't spell check in this case
@@ -233,14 +236,14 @@ namespace MSTranslatorTextDemo
                 }
             }
 
-            // handle null operations: no text or same source/target languages
+            // Handle null operations: no text or same source/target languages
             if (textToTranslate == "" || fromLanguageCode == toLanguageCode)
             {
                 TranslatedTextLabel.Content = textToTranslate;
                 return;
             }
 
-            // send HTTP request to perform the translation
+            // Send translation request
             string endpoint = string.Format(TEXT_TRANSLATION_API_ENDPOINT, "translate");
             string uri = string.Format(endpoint + "&from={0}&to={1}", fromLanguageCode, toLanguageCode);
 
